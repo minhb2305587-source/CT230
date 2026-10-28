@@ -1,0 +1,42 @@
+package vn.edu.bookstore.legacy.adapter.api;
+
+import org.springframework.web.bind.annotation.*;
+import vn.edu.bookstore.legacy.adapter.soap.LegacyCatalogClient;
+
+import java.util.List;
+import java.util.regex.Pattern;
+
+@RestController
+@RequestMapping("/api/v1/legacy/books")
+public class LegacyBookController {
+
+    private static final Pattern ISBN13_PATTERN = Pattern.compile("^97[89][0-9]{10}$");
+    private final LegacyCatalogClient client;
+
+    public LegacyBookController(LegacyCatalogClient client) {
+        this.client = client;
+    }
+
+    @GetMapping("/{isbn}")
+    public BookView getBook(@PathVariable String isbn) {
+        if (!ISBN13_PATTERN.matcher(isbn).matches()) {
+            throw new InvalidRequestException("isbn phải khớp mẫu ^97[89][0-9]{10}$");
+        }
+        return BookView.from(client.getBook(isbn));
+    }
+
+    @GetMapping
+    public List<BookView> search(
+            @RequestParam("q") String keyword,
+            @RequestParam(name = "limit", defaultValue = "10") int limit) {
+        if (keyword.isBlank() || keyword.trim().length() < 2) {
+            throw new InvalidRequestException("q phải có ít nhất 2 ký tự");
+        }
+        if (limit < 1 || limit > 50) {
+            throw new InvalidRequestException("limit phải trong khoảng 1..50");
+        }
+        return client.search(keyword.trim(), limit).stream()
+                .map(BookView::from)
+                .toList();
+    }
+}
