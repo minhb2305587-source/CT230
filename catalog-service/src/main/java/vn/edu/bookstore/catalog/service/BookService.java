@@ -9,6 +9,9 @@ import vn.edu.bookstore.catalog.api.model.BookCreateRequest;
 import vn.edu.bookstore.catalog.api.model.BookUpdateRequest;
 import vn.edu.bookstore.catalog.domain.BookEntity;
 import vn.edu.bookstore.catalog.domain.BookRepository;
+import vn.edu.bookstore.catalog.exception.BookNotFoundException;
+import vn.edu.bookstore.catalog.exception.DuplicateIsbnException;
+import vn.edu.bookstore.catalog.exception.PreconditionFailedException;
 
 @Service
 @Transactional(readOnly = true)
@@ -29,13 +32,13 @@ public class BookService {
 
     public BookEntity get(String isbn) {
         return repository.findByIsbn(isbn)
-                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sách ISBN: " + isbn));
+                .orElseThrow(() -> new BookNotFoundException("Không có sách ISBN " + isbn));
     }
 
     @Transactional
     public BookEntity create(BookCreateRequest request) {
         if (repository.existsByIsbn(request.getIsbn())) {
-            throw new IllegalArgumentException("ISBN đã tồn tại: " + request.getIsbn());
+            throw new DuplicateIsbnException("ISBN đã tồn tại: " + request.getIsbn());
         }
         BigDecimal priceAmount = request.getPrice() != null ? request.getPrice().getAmount() : BigDecimal.ZERO;
         String priceCurrency = (request.getPrice() != null && request.getPrice().getCurrency() != null) 
@@ -54,21 +57,24 @@ public class BookService {
     }
 
     @Transactional
-    public BookEntity update(String isbn, BookUpdateRequest request) {
-        BookEntity entity = get(isbn);
-        BigDecimal priceAmount = request.getPrice() != null ? request.getPrice().getAmount() : BigDecimal.ZERO;
-        String priceCurrency = (request.getPrice() != null && request.getPrice().getCurrency() != null) 
-                ? request.getPrice().getCurrency().getValue() : "VND";
+    public BookEntity update(String isbn, BookUpdateRequest r, long expectedVersion) {
+        BookEntity e = get(isbn);
+        if (e.getVersion() != expectedVersion) {
+            throw new PreconditionFailedException("ETag \"" + expectedVersion + "\" đã cũ, phiên bản hiện tại là \"" + e.getVersion() + "\"");
+        }
+        BigDecimal priceAmount = r.getPrice() != null ? r.getPrice().getAmount() : BigDecimal.ZERO;
+        String priceCurrency = (r.getPrice() != null && r.getPrice().getCurrency() != null) 
+                ? r.getPrice().getCurrency().getValue() : "VND";
 
-        entity.apply(
-                request.getTitle(),
-                request.getAuthor(),
-                request.getAuthorId(),
-                request.getPublishedYear(),
+        e.apply(
+                r.getTitle(),
+                r.getAuthor(),
+                r.getAuthorId(),
+                r.getPublishedYear(),
                 priceAmount,
                 priceCurrency
         );
-        return repository.saveAndFlush(entity);
+        return repository.saveAndFlush(e);
     }
 
     @Transactional
