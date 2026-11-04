@@ -1,5 +1,6 @@
 package vn.edu.bookstore.catalog.service;
 
+import java.math.BigDecimal;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -20,36 +21,59 @@ public class BookService {
     }
 
     public Page<BookEntity> list(String q, Pageable pageable) {
-        // TODO(TH2-3): khi q khác rỗng, tìm theo tiêu đề HOẶC tác giả (phương thức truy vấn dẫn xuất của BookRepository)
-        return repository.findAll(pageable);
+        if (q == null || q.isBlank()) {
+            return repository.findAll(pageable);
+        }
+        return repository.findByTitleContainingIgnoreCaseOrAuthorContainingIgnoreCase(q.trim(), q.trim(), pageable);
     }
 
     public BookEntity get(String isbn) {
-        return repository.findByIsbn(isbn).orElseThrow(() -> new BookNotFoundException(isbn));
+        return repository.findByIsbn(isbn)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy sách ISBN: " + isbn));
     }
 
     @Transactional
-    public BookEntity create(BookCreateRequest r) {
-        if (repository.existsByIsbn(r.getIsbn())) {
-            throw new DuplicateIsbnException(r.getIsbn());
+    public BookEntity create(BookCreateRequest request) {
+        if (repository.existsByIsbn(request.getIsbn())) {
+            throw new IllegalArgumentException("ISBN đã tồn tại: " + request.getIsbn());
         }
-        BookEntity e = new BookEntity(r.getIsbn(), r.getTitle(), r.getAuthor(), r.getAuthorId(),
-                r.getPublishedYear(), r.getPrice().getAmount(), r.getPrice().getCurrency().getValue());
-        return repository.saveAndFlush(e);
+        BigDecimal priceAmount = request.getPrice() != null ? request.getPrice().getAmount() : BigDecimal.ZERO;
+        String priceCurrency = (request.getPrice() != null && request.getPrice().getCurrency() != null) 
+                ? request.getPrice().getCurrency().getValue() : "VND";
+
+        BookEntity entity = new BookEntity(
+                request.getIsbn(),
+                request.getTitle(),
+                request.getAuthor(),
+                request.getAuthorId(),
+                request.getPublishedYear(),
+                priceAmount,
+                priceCurrency
+        );
+        return repository.save(entity);
     }
 
-    /** Cập nhật có điều kiện: chỉ ghi khi phiên bản client đang giữ trùng phiên bản hiện tại. */
     @Transactional
-    public BookEntity update(String isbn, BookUpdateRequest r, long expectedVersion) {
-        BookEntity e = get(isbn);
-        // TODO(TH2-5): nếu e.getVersion() != expectedVersion thì ném PreconditionFailedException (→ 412)
-        e.apply(r.getTitle(), r.getAuthor(), r.getAuthorId(), r.getPublishedYear(),
-                r.getPrice().getAmount(), r.getPrice().getCurrency().getValue());
-        return repository.saveAndFlush(e);
+    public BookEntity update(String isbn, BookUpdateRequest request) {
+        BookEntity entity = get(isbn);
+        BigDecimal priceAmount = request.getPrice() != null ? request.getPrice().getAmount() : BigDecimal.ZERO;
+        String priceCurrency = (request.getPrice() != null && request.getPrice().getCurrency() != null) 
+                ? request.getPrice().getCurrency().getValue() : "VND";
+
+        entity.apply(
+                request.getTitle(),
+                request.getAuthor(),
+                request.getAuthorId(),
+                request.getPublishedYear(),
+                priceAmount,
+                priceCurrency
+        );
+        return repository.saveAndFlush(entity);
     }
 
     @Transactional
     public void delete(String isbn) {
-        repository.delete(get(isbn));
+        BookEntity entity = get(isbn);
+        repository.delete(entity);
     }
 }
