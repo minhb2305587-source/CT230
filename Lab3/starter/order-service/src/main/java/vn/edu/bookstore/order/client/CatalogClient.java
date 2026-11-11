@@ -17,17 +17,22 @@ public class CatalogClient {
         this.restClient = catalogRestClient;
         this.circuitBreaker = circuitBreakerFactory.create("catalog");
     }
-
-    public BookInfo getBook(String isbn) {
-        // TODO(TH3-3): bọc lời gọi bằng circuitBreaker.run(supplier, fallback):
-        //   - fallback ném lại UnknownBookException nguyên vẹn (lỗi nghiệp vụ)
-        //   - mọi lỗi khác → CatalogUnavailableException
-        return restClient.get()
+	public BookInfo getBook(String isbn) {
+        // TH3-3: cầu dao bao quanh lời gọi; 404 là lỗi nghiệp vụ nên được ném lại nguyên vẹn
+        return circuitBreaker.run(
+            () -> restClient.get()
                 .uri("/api/v1/books/{isbn}", isbn)
                 .retrieve()
                 .onStatus(s -> s.value() == HttpStatus.NOT_FOUND.value(), (req, res) -> {
                     throw new UnknownBookException(isbn);
                 })
-                .body(BookInfo.class);
+                .body(BookInfo.class),
+            failure -> {
+                if (failure instanceof UnknownBookException unknown) {
+                    throw unknown;
+                }
+                throw new CatalogUnavailableException(
+                    "catalog-service không sẵn sàng: " + failure.getClass().getSimpleName(), failure);
+            });
     }
 }

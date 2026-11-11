@@ -18,6 +18,7 @@ import vn.edu.bookstore.order.client.UnknownBookException;
 import vn.edu.bookstore.order.service.IdempotencyConflictException;
 import vn.edu.bookstore.order.service.InvalidOrderException;
 import vn.edu.bookstore.order.service.OrderNotFoundException;
+import vn.edu.bookstore.order.client.CatalogUnavailableException;
 @RestControllerAdvice
 public class GlobalProblemHandler extends ResponseEntityExceptionHandler {
 
@@ -36,6 +37,16 @@ public class GlobalProblemHandler extends ResponseEntityExceptionHandler {
 
     // TODO(TH3-5): @ExceptionHandler(CatalogUnavailableException.class) → 503, type upstream-unavailable,
     //   kèm header Retry-After: 10
+@ExceptionHandler(CatalogUnavailableException.class)
+    public ResponseEntity<ProblemDetail> handleCatalogUnavailable(CatalogUnavailableException ex) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+        problem.setType(URI.create("/upstream-unavailable"));
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, "10")
+                .body(problem);
+    }
 
     @ExceptionHandler(InvalidOrderException.class)
     ProblemDetail invalid(InvalidOrderException e, HttpServletRequest req) {
