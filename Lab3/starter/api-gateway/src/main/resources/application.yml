@@ -16,9 +16,14 @@ spring:
               uri: ${bookstore.routes.catalog:lb://catalog-service}
               predicates:
                 - Path=/api/v1/books/**
-            # TODO(TH3-1): thêm tuyến "orders" (/api/v1/orders/** → lb://order-service)
-            #              và "inventory" (/api/v1/inventory/** → lb://inventory-service),
-            #              uri dạng ${bookstore.routes.orders:lb://order-service} để kiểm thử ghi đè được
+            - id: orders
+              uri: ${bookstore.routes.orders:lb://order-service}
+              predicates:
+                - Path=/api/v1/orders/**
+            - id: inventory
+              uri: ${bookstore.routes.inventory:lb://inventory-service}
+              predicates:
+                - Path=/api/v1/inventory/**
 
 eureka:
   client:
@@ -33,6 +38,8 @@ management:
       exposure:
         include: health,info,gateway,prometheus,metrics
   endpoint:
+    gateway:
+      enabled: true
     health:
       probes:
         enabled: true
