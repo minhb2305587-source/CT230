@@ -28,21 +28,33 @@ public class OrderController {
         this.service = service;
     }
 
-    @PostMapping
-    public ResponseEntity<OrderView> create(@RequestHeader(value = "Idempotency-Key", required = false) String key,
-                                            @Valid @RequestBody CreateOrderRequest request) {
-        if (key != null && (key.isBlank() || key.length() > 100)) {
-            throw new InvalidOrderException("Idempotency-Key phải có 1..100 ký tự");
-        }
-        long customerId = request.customerId();
-        PlaceOrderResult result = service.place(customerId, request, key);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}").buildAndExpand(result.order().id()).toUri();
-        return ResponseEntity.created(location)
-                .header("Idempotent-Replayed", String.valueOf(result.replayed()))
-                .body(result.order());
-    }
+ @PostMapping
 
+    public ResponseEntity<OrderView> create(@RequestHeader(value = "Idempotency-Key", required = false) String key,
+
+                                            @Valid @RequestBody CreateOrderRequest request) {
+
+        if (key != null && (key.isBlank() || key.length() > 100)) {
+
+            throw new InvalidOrderException("Idempotency-Key phải có 1..100 ký tự");
+
+        }
+
+        long customerId = request.customerId();
+
+        PlaceOrderResult result = service.place(customerId, request, key);
+
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+
+                .path("/{id}").buildAndExpand(result.order().id()).toUri();
+
+        return ResponseEntity.created(location)
+
+                .header("Idempotent-Replayed", String.valueOf(result.replayed()))
+
+                .body(result.order());
+
+    } 
     @GetMapping("/{id}")
     public OrderView get(@PathVariable long id) {
         return service.get(id);

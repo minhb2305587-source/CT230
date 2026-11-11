@@ -29,11 +29,18 @@ public class OrderService {
         this.tx = tx;
     }
 
-    public PlaceOrderResult place(long customerId, CreateOrderRequest request, String idempotencyKey) {
+public PlaceOrderResult place(long customerId, CreateOrderRequest request, String idempotencyKey) {
         String hash = requestHash(customerId, request);
-        // TODO(TH3-4): nếu có idempotencyKey và đã có đơn với khoá này thì trả lại đơn cũ
-        //   (gọi replay(idempotencyKey, hash)); cùng khoá nhưng khác nội dung → IdempotencyConflictException
-        // Gọi catalog-service NGOÀI giao dịch CSDL (không giữ kết nối CSDL trong lúc chờ mạng)
+
+        // TH3-4: nếu có idempotencyKey và đã có đơn với khoá này thì trả lại đơn cũ
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            var replayed = replay(idempotencyKey, hash);
+            if (replayed.isPresent()) {
+                return replayed.get();
+            }
+        }
+
+        // Gọi catalog-service NGOÀI giao dịch CSDL
         List<Priced> priced = new ArrayList<>();
         for (CreateOrderRequest.Line line : request.lines()) {
             BookInfo book = catalog.getBook(line.isbn());
@@ -52,11 +59,9 @@ public class OrderService {
             });
             return new PlaceOrderResult(view, false);
         } catch (DataIntegrityViolationException race) {
-            // hai yêu cầu cùng khoá đến đồng thời: yêu cầu thua đọc lại kết quả của yêu cầu thắng
             return replay(idempotencyKey, hash).orElseThrow(() -> race);
         }
     }
-
     private Optional<PlaceOrderResult> replay(String key, String hash) {
         if (key == null) {
             return Optional.empty();
