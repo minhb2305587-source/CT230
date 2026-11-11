@@ -92,7 +92,6 @@
       <scope>test</scope>
       <version>${project.version}</version>
       <classifier>stubs</classifier>
-      <!-- chỉ lấy tệp stub WireMock, không kéo phụ thuộc của catalog-service -->
       <exclusions>
         <exclusion>
           <groupId>*</groupId>

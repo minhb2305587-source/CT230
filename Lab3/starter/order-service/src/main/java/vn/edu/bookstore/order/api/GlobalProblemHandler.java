@@ -41,7 +41,7 @@ public class GlobalProblemHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ProblemDetail> handleCatalogUnavailable(CatalogUnavailableException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
-        problem.setType(URI.create("/upstream-unavailable"));
+        problem.setType(URI.create("https://api.bookstore.vn/problems/upstream-unavailable"));
 
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .header(HttpHeaders.RETRY_AFTER, "10")
